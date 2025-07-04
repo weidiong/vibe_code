@@ -1,0 +1,45 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15
+    container_name: task_tiles_postgres
+    environment:
+      POSTGRES_DB: task_tiles_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres123
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  app:
+    build: .
+    container_name: task_tiles_app
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: task_tiles_db
+      DB_USER: postgres
+      DB_PASSWORD: postgres123
+      PORT: 3000
+      NODE_ENV: production
+      FRONTEND_URL: http://localhost:3000
+      JWT_SECRET: your-super-secure-jwt-secret-key-change-this-in-production
+    ports:
+      - "3000:3000"
+    volumes:
+      - .:/app
+      - /app/node_modules
+    command: sh -c "npm run setup-db && npm start"
+
+volumes:
+  postgres_data: 

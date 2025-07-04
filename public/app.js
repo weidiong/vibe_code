@@ -45,6 +45,29 @@ class TaskTilesApp {
             this.resetBoard();
         });
         
+        // Column preset selector
+        document.getElementById('column-preset').addEventListener('change', (e) => {
+            if (e.target.value) {
+                document.getElementById('column-name').value = e.target.value;
+            }
+        });
+        
+        // Color swatch selection
+        document.addEventListener('click', (e) => {
+            if (e.target.classList.contains('color-swatch')) {
+                // Remove selected class from all swatches
+                document.querySelectorAll('.color-swatch').forEach(swatch => {
+                    swatch.classList.remove('selected');
+                });
+                
+                // Add selected class to clicked swatch
+                e.target.classList.add('selected');
+                
+                // Update hidden color input
+                document.getElementById('column-color').value = e.target.dataset.color;
+            }
+        });
+        
         // Board Form Submit
         document.getElementById('board-form').addEventListener('submit', (e) => {
             e.preventDefault();
@@ -126,16 +149,8 @@ class TaskTilesApp {
     }
     
     setConnectionStatus(connected) {
-        const indicator = document.getElementById('connection-indicator');
+        // Connection status display removed per user feedback
         this.isConnected = connected;
-        
-        if (connected) {
-            indicator.className = 'connected';
-            indicator.innerHTML = '<i class="fas fa-wifi"></i> Connected';
-        } else {
-            indicator.className = 'disconnected';
-            indicator.innerHTML = '<i class="fas fa-wifi"></i> Disconnected';
-        }
     }
     
     showLoading() {
@@ -260,14 +275,10 @@ class TaskTilesApp {
     }
     
     createTaskElement(task) {
-        const createdAt = new Date(task.created_at).toLocaleDateString();
         return `
             <div class="task-tile" draggable="true" data-task-id="${task.id}">
                 <div class="task-title">${task.title}</div>
                 ${task.description ? `<div class="task-description">${task.description}</div>` : ''}
-                <div class="task-meta">
-                    <span>Created: ${createdAt}</span>
-                </div>
                 <div class="task-actions">
                     <button class="btn btn-icon btn-warning" data-action="edit-task" data-task-id="${task.id}">
                         <i class="fas fa-edit"></i>
@@ -351,8 +362,21 @@ class TaskTilesApp {
     }
     
     showColumnModal() {
+        document.getElementById('column-preset').value = '';
         document.getElementById('column-name').value = '';
         document.getElementById('column-color').value = '#667eea';
+        
+        // Reset color swatch selection
+        document.querySelectorAll('.color-swatch').forEach(swatch => {
+            swatch.classList.remove('selected');
+        });
+        
+        // Select the first color swatch by default
+        const firstSwatch = document.querySelector('.color-swatch');
+        if (firstSwatch) {
+            firstSwatch.classList.add('selected');
+        }
+        
         document.getElementById('column-modal').style.display = 'block';
         document.getElementById('column-name').focus();
     }

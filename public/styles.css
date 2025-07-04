@@ -107,25 +107,33 @@ body {
     flex-wrap: wrap;
 }
 
-.connection-status {
-    margin-left: auto;
+/* Color picker styles */
+.color-picker {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 0.5rem;
+    margin: 1rem 0;
 }
 
-.connection-status span {
-    padding: 0.5rem 1rem;
-    border-radius: 6px;
-    font-size: 0.9rem;
-    font-weight: 600;
+.color-swatch {
+    width: 40px;
+    height: 40px;
+    border-radius: 8px;
+    cursor: pointer;
+    border: 3px solid transparent;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
-.connection-status .connected {
-    background: #48bb78;
-    color: white;
+.color-swatch:hover {
+    transform: scale(1.1);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
 }
 
-.connection-status .disconnected {
-    background: #f56565;
-    color: white;
+.color-swatch.selected {
+    border-color: #333;
+    transform: scale(1.1);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
 }
 
 .btn {
@@ -302,11 +310,7 @@ body {
 }
 
 .task-meta {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    font-size: 0.8rem;
-    color: #a0aec0;
+    display: none; /* Hide task meta as per feedback */
 }
 
 .task-actions {
@@ -398,8 +402,21 @@ body {
     color: #2d3748;
 }
 
+.modal label {
+    display: block;
+    margin-bottom: 0.5rem;
+    margin-top: 1rem;
+    font-weight: 600;
+    color: #2d3748;
+}
+
+.modal label:first-of-type {
+    margin-top: 0;
+}
+
 .modal input,
-.modal textarea {
+.modal textarea,
+.modal select {
     width: 100%;
     padding: 0.75rem;
     border: 2px solid #e2e8f0;
@@ -407,10 +424,12 @@ body {
     font-size: 1rem;
     margin-bottom: 1rem;
     transition: border-color 0.3s ease;
+    background: white;
 }
 
 .modal input:focus,
-.modal textarea:focus {
+.modal textarea:focus,
+.modal select:focus {
     outline: none;
     border-color: #667eea;
 }
@@ -482,10 +501,6 @@ body {
     .board-controls {
         flex-direction: column;
         align-items: center;
-    }
-    
-    .connection-status {
-        margin-left: 0;
     }
     
     .header h1 {

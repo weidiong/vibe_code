@@ -34,11 +34,6 @@
             <button id="reset-board-btn" class="btn btn-secondary">
                 <i class="fas fa-refresh"></i> Reset Board
             </button>
-            <div class="connection-status">
-                <span id="connection-indicator" class="connected">
-                    <i class="fas fa-wifi"></i> Connected
-                </span>
-            </div>
         </div>
 
         <div id="board" class="board">
@@ -69,8 +64,34 @@
             <span class="close">&times;</span>
             <h2>Add New Column</h2>
             <form id="column-form">
+                <label for="column-preset">Quick Select:</label>
+                <select id="column-preset">
+                    <option value="">Choose a preset or create custom...</option>
+                    <option value="To Do">To Do</option>
+                    <option value="In Progress">In Progress</option>
+                    <option value="Done">Done</option>
+                    <option value="Backlog">Backlog</option>
+                    <option value="Review">Review</option>
+                    <option value="Testing">Testing</option>
+                    <option value="Deployment">Deployment</option>
+                </select>
                 <input type="text" id="column-name" placeholder="Column Name" required>
-                <input type="color" id="column-color" value="#667eea">
+                <label>Color:</label>
+                <div class="color-picker">
+                    <div class="color-swatch" data-color="#667eea" style="background-color: #667eea"></div>
+                    <div class="color-swatch" data-color="#f093fb" style="background-color: #f093fb"></div>
+                    <div class="color-swatch" data-color="#4ecdc4" style="background-color: #4ecdc4"></div>
+                    <div class="color-swatch" data-color="#45b7d1" style="background-color: #45b7d1"></div>
+                    <div class="color-swatch" data-color="#f9ca24" style="background-color: #f9ca24"></div>
+                    <div class="color-swatch" data-color="#f0932b" style="background-color: #f0932b"></div>
+                    <div class="color-swatch" data-color="#eb4d4b" style="background-color: #eb4d4b"></div>
+                    <div class="color-swatch" data-color="#6c5ce7" style="background-color: #6c5ce7"></div>
+                    <div class="color-swatch" data-color="#a29bfe" style="background-color: #a29bfe"></div>
+                    <div class="color-swatch" data-color="#fd79a8" style="background-color: #fd79a8"></div>
+                    <div class="color-swatch" data-color="#00b894" style="background-color: #00b894"></div>
+                    <div class="color-swatch" data-color="#e17055" style="background-color: #e17055"></div>
+                </div>
+                <input type="hidden" id="column-color" value="#667eea">
                 <button type="submit" class="btn btn-primary">Add Column</button>
             </form>
         </div>

@@ -10,10 +10,10 @@
 
 body {
     font-family: 'Inter', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
+    background: linear-gradient(135deg, #f0f9ff 0%, #e0e7ff 30%, #fdf2f8 70%, #fef3f2 100%);
     background-attachment: fixed;
     min-height: 100vh;
-    color: #333;
+    color: #1f2937;
     position: relative;
 }
 
@@ -53,22 +53,23 @@ body {
 
 /* Header Styles */
 .header {
-    background: rgba(255, 255, 255, 0.98);
+    background: rgba(255, 255, 255, 0.9);
     backdrop-filter: blur(20px);
     padding: 1.5rem 2rem;
     text-align: center;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+    border-bottom: 1px solid rgba(226, 232, 240, 0.3);
 }
 
 .header h1 {
     font-size: 2.5rem;
-    color: #4a5568;
+    color: #1f2937;
     margin-bottom: 0.5rem;
+    font-weight: 700;
 }
 
 .header p {
-    color: #718096;
+    color: #4b5563;
     font-size: 1.1rem;
     margin-bottom: 1rem;
 }
@@ -173,15 +174,15 @@ body {
 }
 
 .btn-primary {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: linear-gradient(135deg, #3b82f6 0%, #6366f1 100%);
     color: white;
-    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+    box-shadow: 0 4px 15px rgba(59, 130, 246, 0.3);
 }
 
 .btn-primary:hover {
-    background: linear-gradient(135deg, #5a67d8 0%, #6a4c93 100%);
+    background: linear-gradient(135deg, #2563eb 0%, #4f46e5 100%);
     transform: translateY(-3px);
-    box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
+    box-shadow: 0 8px 25px rgba(59, 130, 246, 0.4);
 }
 
 .btn-secondary {
@@ -255,18 +256,18 @@ body {
 
 .column {
     min-width: 320px;
-    background: rgba(255, 255, 255, 0.98);
+    background: rgba(255, 255, 255, 0.95);
     border-radius: 16px;
     padding: 1.25rem;
-    box-shadow: 0 8px 40px rgba(0, 0, 0, 0.12);
+    box-shadow: 0 8px 40px rgba(0, 0, 0, 0.08);
     backdrop-filter: blur(20px);
     transition: all 0.4s cubic-bezier(0.25, 0.8, 0.25, 1);
-    border: 1px solid rgba(255, 255, 255, 0.3);
+    border: 1px solid rgba(226, 232, 240, 0.4);
 }
 
 .column:hover {
     transform: translateY(-8px);
-    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.12);
 }
 
 .column-header {
@@ -287,18 +288,18 @@ body {
 .column-title {
     font-size: 1.3rem;
     font-weight: 700;
-    color: #2d3748;
+    color: #1f2937;
     margin: 0;
 }
 
 .task-counter {
-    background: rgba(102, 126, 234, 0.1);
-    color: #667eea;
+    background: linear-gradient(135deg, #3b82f6, #6366f1);
+    color: white;
     padding: 0.25rem 0.5rem;
     border-radius: 12px;
     font-size: 0.8rem;
     font-weight: 600;
-    border: 1px solid rgba(102, 126, 234, 0.2);
+    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
 }
 
 .column-controls {
@@ -318,15 +319,15 @@ body {
 }
 
 .task-tile {
-    background: linear-gradient(145deg, #ffffff 0%, #f8fafc 100%);
+    background: linear-gradient(145deg, #ffffff 0%, #f9fafb 100%);
     border-radius: 12px;
     padding: 1.25rem;
     margin-bottom: 1rem;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
     cursor: move;
     transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
-    border-left: 4px solid #667eea;
-    border: 1px solid rgba(226, 232, 240, 0.4);
+    border-left: 4px solid #3b82f6;
+    border: 1px solid rgba(209, 213, 219, 0.6);
     position: relative;
     overflow: hidden;
 }
@@ -338,13 +339,13 @@ body {
     left: 0;
     right: 0;
     height: 1px;
-    background: linear-gradient(90deg, transparent, rgba(102, 126, 234, 0.3), transparent);
+    background: linear-gradient(90deg, transparent, rgba(59, 130, 246, 0.4), transparent);
 }
 
 .task-tile:hover {
     transform: translateY(-4px);
-    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
-    border-color: rgba(102, 126, 234, 0.3);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.1);
+    border-color: rgba(59, 130, 246, 0.4);
 }
 
 .task-tile.dragging {
@@ -361,14 +362,14 @@ body {
 
 .task-title {
     font-weight: 600;
-    color: #2d3748;
+    color: #1f2937;
     margin: 0;
     flex: 1;
     font-size: 1rem;
 }
 
 .story-points {
-    background: linear-gradient(135deg, #667eea, #764ba2);
+    background: linear-gradient(135deg, #3b82f6, #6366f1);
     color: white;
     padding: 0.25rem 0.5rem;
     border-radius: 8px;
@@ -376,13 +377,13 @@ body {
     font-weight: 700;
     min-width: 24px;
     text-align: center;
-    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
     flex-shrink: 0;
     margin-left: 0.5rem;
 }
 
 .task-description {
-    color: #718096;
+    color: #4b5563;
     font-size: 0.9rem;
     line-height: 1.5;
     margin-bottom: 0.75rem;
@@ -413,19 +414,19 @@ body {
 
 /* Drop Zone Styles */
 .drop-zone {
-    border: 2px dashed #cbd5e0;
+    border: 2px dashed #d1d5db;
     border-radius: 8px;
     padding: 2rem;
     text-align: center;
-    color: #a0aec0;
+    color: #6b7280;
     transition: all 0.3s ease;
     margin: 0.5rem 0;
 }
 
 .drop-zone.dragover {
-    border-color: #667eea;
-    background: rgba(102, 126, 234, 0.1);
-    color: #667eea;
+    border-color: #3b82f6;
+    background: rgba(59, 130, 246, 0.1);
+    color: #3b82f6;
 }
 
 /* Modal Styles */
@@ -478,7 +479,7 @@ body {
 
 .modal h2 {
     margin-bottom: 1.5rem;
-    color: #2d3748;
+    color: #1f2937;
 }
 
 .modal label {
@@ -486,7 +487,7 @@ body {
     margin-bottom: 0.5rem;
     margin-top: 1rem;
     font-weight: 600;
-    color: #2d3748;
+    color: #1f2937;
 }
 
 .modal label:first-of-type {

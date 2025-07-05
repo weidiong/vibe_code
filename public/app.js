@@ -243,10 +243,14 @@ class TaskTilesApp {
         columnDiv.setAttribute('data-column-id', column.id);
         
         const tasks = column.tasks || [];
+        const taskCount = tasks.length;
         
         columnDiv.innerHTML = `
             <div class="column-header">
-                <h3 class="column-title" style="color: ${column.color}">${column.name}</h3>
+                <div class="column-title-section">
+                    <h3 class="column-title" style="color: ${column.color}">${column.name}</h3>
+                    <span class="task-counter">${taskCount}</span>
+                </div>
                 <div class="column-controls">
                     <button class="btn btn-primary btn-small" data-action="add-task" data-column-id="${column.id}">
                         <i class="fas fa-plus"></i> Add Task
@@ -277,7 +281,10 @@ class TaskTilesApp {
     createTaskElement(task) {
         return `
             <div class="task-tile" draggable="true" data-task-id="${task.id}">
-                <div class="task-title">${task.title}</div>
+                <div class="task-header">
+                    <div class="task-title">${task.title}</div>
+                    ${task.story_points ? `<div class="story-points">${task.story_points}</div>` : ''}
+                </div>
                 ${task.description ? `<div class="task-description">${task.description}</div>` : ''}
                 <div class="task-actions">
                     <button class="btn btn-icon btn-warning" data-action="edit-task" data-task-id="${task.id}">
@@ -384,6 +391,7 @@ class TaskTilesApp {
     showTaskModal(columnId) {
         document.getElementById('task-title').value = '';
         document.getElementById('task-description').value = '';
+        document.getElementById('task-story-points').value = '';
         document.getElementById('target-column').value = columnId;
         document.getElementById('task-modal').style.display = 'block';
         document.getElementById('task-title').focus();
@@ -404,6 +412,7 @@ class TaskTilesApp {
         
         document.getElementById('edit-task-title').value = task.title;
         document.getElementById('edit-task-description').value = task.description || '';
+        document.getElementById('edit-task-story-points').value = task.story_points || '';
         document.getElementById('edit-task-id').value = taskId;
         document.getElementById('edit-task-modal').style.display = 'block';
         document.getElementById('edit-task-title').focus();
@@ -469,6 +478,7 @@ class TaskTilesApp {
         try {
             const title = document.getElementById('task-title').value.trim();
             const description = document.getElementById('task-description').value.trim();
+            const storyPoints = document.getElementById('task-story-points').value;
             const columnId = document.getElementById('target-column').value;
             
             if (!title) {
@@ -481,14 +491,20 @@ class TaskTilesApp {
                 return;
             }
             
+            const taskData = {
+                column_id: columnId,
+                board_id: this.currentBoard.id,
+                title,
+                description
+            };
+            
+            if (storyPoints && parseInt(storyPoints) > 0) {
+                taskData.story_points = parseInt(storyPoints);
+            }
+            
             await this.apiRequest('/tasks', {
                 method: 'POST',
-                body: JSON.stringify({
-                    column_id: columnId,
-                    board_id: this.currentBoard.id,
-                    title,
-                    description
-                })
+                body: JSON.stringify(taskData)
             });
             
             document.getElementById('task-modal').style.display = 'none';
@@ -503,6 +519,7 @@ class TaskTilesApp {
         try {
             const title = document.getElementById('edit-task-title').value.trim();
             const description = document.getElementById('edit-task-description').value.trim();
+            const storyPoints = document.getElementById('edit-task-story-points').value;
             const taskId = document.getElementById('edit-task-id').value;
             
             if (!title) {
@@ -510,9 +527,15 @@ class TaskTilesApp {
                 return;
             }
             
+            const updateData = { title, description };
+            
+            if (storyPoints !== '') {
+                updateData.story_points = storyPoints ? parseInt(storyPoints) : null;
+            }
+            
             await this.apiRequest(`/tasks/${taskId}`, {
                 method: 'PUT',
-                body: JSON.stringify({ title, description })
+                body: JSON.stringify(updateData)
             });
             
             document.getElementById('edit-task-modal').style.display = 'none';

@@ -34,11 +34,22 @@ const createTables = async () => {
         board_id UUID REFERENCES boards(id) ON DELETE CASCADE,
         title VARCHAR(255) NOT NULL,
         description TEXT,
+        story_points INTEGER DEFAULT NULL,
         position INTEGER NOT NULL DEFAULT 0,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
+
+    // Add story_points column if it doesn't exist (for existing databases)
+    try {
+      await pool.query(`
+        ALTER TABLE tasks ADD COLUMN IF NOT EXISTS story_points INTEGER DEFAULT NULL;
+      `);
+      console.log('✅ Added story_points column to existing tasks table');
+    } catch (error) {
+      console.log('ℹ️ story_points column already exists or could not be added');
+    }
 
     // Create indexes for better performance
     await pool.query(`
@@ -75,19 +86,27 @@ const createTables = async () => {
         // Insert sample tasks
         if (col.name === 'To Do') {
           await pool.query(`
-            INSERT INTO tasks (column_id, board_id, title, description, position)
-            VALUES ($1, $2, $3, $4, $5)
-          `, [columnResult.rows[0].id, boardId, 'Design UI Components', 'Create wireframes and mockups for the main interface', 0]);
+            INSERT INTO tasks (column_id, board_id, title, description, story_points, position)
+            VALUES ($1, $2, $3, $4, $5, $6)
+          `, [columnResult.rows[0].id, boardId, 'Design UI Components', 'Create wireframes and mockups for the main interface', 8, 0]);
+          await pool.query(`
+            INSERT INTO tasks (column_id, board_id, title, description, story_points, position)
+            VALUES ($1, $2, $3, $4, $5, $6)
+          `, [columnResult.rows[0].id, boardId, 'User Authentication System', 'Implement login and registration functionality', 13, 1]);
         } else if (col.name === 'In Progress') {
           await pool.query(`
-            INSERT INTO tasks (column_id, board_id, title, description, position)
-            VALUES ($1, $2, $3, $4, $5)
-          `, [columnResult.rows[0].id, boardId, 'Setup Database', 'Configure PostgreSQL and create schema', 0]);
+            INSERT INTO tasks (column_id, board_id, title, description, story_points, position)
+            VALUES ($1, $2, $3, $4, $5, $6)
+          `, [columnResult.rows[0].id, boardId, 'Setup Database', 'Configure PostgreSQL and create schema', 5, 0]);
         } else if (col.name === 'Done') {
           await pool.query(`
-            INSERT INTO tasks (column_id, board_id, title, description, position)
-            VALUES ($1, $2, $3, $4, $5)
-          `, [columnResult.rows[0].id, boardId, 'Project Planning', 'Define requirements and technical architecture', 0]);
+            INSERT INTO tasks (column_id, board_id, title, description, story_points, position)
+            VALUES ($1, $2, $3, $4, $5, $6)
+          `, [columnResult.rows[0].id, boardId, 'Project Planning', 'Define requirements and technical architecture', 3, 0]);
+          await pool.query(`
+            INSERT INTO tasks (column_id, board_id, title, description, story_points, position)
+            VALUES ($1, $2, $3, $4, $5, $6)
+          `, [columnResult.rows[0].id, boardId, 'Initial Setup', 'Setup development environment and tools', 2, 1]);
         }
       }
     }

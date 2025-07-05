@@ -105,6 +105,8 @@
             <form id="task-form">
                 <input type="text" id="task-title" placeholder="Task Title" required>
                 <textarea id="task-description" placeholder="Task Description (optional)" rows="3"></textarea>
+                <label for="task-story-points">Story Points:</label>
+                <input type="number" id="task-story-points" placeholder="Story Points" min="0" max="100" step="1">
                 <input type="hidden" id="target-column">
                 <button type="submit" class="btn btn-primary">Add Task</button>
             </form>
@@ -119,6 +121,8 @@
             <form id="edit-task-form">
                 <input type="text" id="edit-task-title" placeholder="Task Title" required>
                 <textarea id="edit-task-description" placeholder="Task Description (optional)" rows="3"></textarea>
+                <label for="edit-task-story-points">Story Points:</label>
+                <input type="number" id="edit-task-story-points" placeholder="Story Points" min="0" max="100" step="1">
                 <input type="hidden" id="edit-task-id">
                 <button type="submit" class="btn btn-primary">Update Task</button>
             </form>

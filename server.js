@@ -154,10 +154,11 @@ app.post('/api/tasks', [
   body('board_id').isUUID().withMessage('Valid board ID is required'),
   body('title').trim().notEmpty().withMessage('Task title is required'),
   body('description').optional().trim(),
+  body('story_points').optional().isInt({ min: 0, max: 100 }).withMessage('Story points must be between 0 and 100'),
   body('position').optional().isInt({ min: 0 }).withMessage('Position must be a non-negative integer')
 ], handleValidationErrors, async (req, res) => {
   try {
-    const { column_id, board_id, title, description, position } = req.body;
+    const { column_id, board_id, title, description, story_points, position } = req.body;
     
     // Get next position if not provided
     let finalPosition = position;
@@ -170,8 +171,8 @@ app.post('/api/tasks', [
     }
     
     const result = await pool.query(
-      'INSERT INTO tasks (column_id, board_id, title, description, position) VALUES ($1, $2, $3, $4, $5) RETURNING *',
-      [column_id, board_id, title, description, finalPosition]
+      'INSERT INTO tasks (column_id, board_id, title, description, story_points, position) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
+      [column_id, board_id, title, description, story_points, finalPosition]
     );
     
     res.status(201).json(result.rows[0]);
@@ -219,11 +220,12 @@ app.put('/api/tasks/:id/move', [
 // Update task
 app.put('/api/tasks/:id', [
   body('title').optional().trim().notEmpty().withMessage('Task title cannot be empty'),
-  body('description').optional().trim()
+  body('description').optional().trim(),
+  body('story_points').optional().isInt({ min: 0, max: 100 }).withMessage('Story points must be between 0 and 100')
 ], handleValidationErrors, async (req, res) => {
   try {
     const { id } = req.params;
-    const { title, description } = req.body;
+    const { title, description, story_points } = req.body;
     
     const updateFields = [];
     const values = [];
@@ -238,6 +240,12 @@ app.put('/api/tasks/:id', [
     if (description !== undefined) {
       updateFields.push(`description = $${paramCount}`);
       values.push(description);
+      paramCount++;
+    }
+    
+    if (story_points !== undefined) {
+      updateFields.push(`story_points = $${paramCount}`);
+      values.push(story_points);
       paramCount++;
     }
     

@@ -6,6 +6,8 @@ class TaskTilesApp {
         this.boards = [];
         this.draggedTask = null;
         this.isConnected = true;
+        this.searchTerm = '';
+        this.allTasks = [];
         
         this.init();
     }
@@ -22,6 +24,7 @@ class TaskTilesApp {
             if (e.target.value) {
                 this.loadBoard(e.target.value);
             } else {
+                this.currentBoard = null;
                 this.showEmptyState();
             }
         });
@@ -108,12 +111,32 @@ class TaskTilesApp {
             });
         });
         
+        // Search functionality
+        const searchInput = document.getElementById('task-search');
+        const clearSearchBtn = document.getElementById('clear-search');
+        
+        searchInput.addEventListener('input', (e) => {
+            this.searchTerm = e.target.value.trim();
+            this.performSearch();
+            this.updateClearButtonVisibility();
+        });
+        
+        clearSearchBtn.addEventListener('click', () => {
+            this.clearSearch();
+        });
+        
         // Keyboard shortcuts
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape') {
+                // Close modals first
                 document.querySelectorAll('.modal').forEach(modal => {
                     modal.style.display = 'none';
                 });
+                
+                // Clear search if it's active
+                if (this.searchTerm) {
+                    this.clearSearch();
+                }
             }
             
             if ((e.ctrlKey || e.metaKey) && e.key === 'n') {
@@ -121,6 +144,13 @@ class TaskTilesApp {
                 if (this.currentBoard) {
                     this.showColumnModal();
                 }
+            }
+            
+            // Focus search with Ctrl+F or Cmd+F
+            if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+                e.preventDefault();
+                searchInput.focus();
+                searchInput.select();
             }
         });
     }
@@ -173,6 +203,178 @@ class TaskTilesApp {
         }, 3000);
     }
     
+    // Search functionality methods
+    performSearch() {
+        if (!this.currentBoard || !this.currentBoard.columns) {
+            this.updateSearchResultsCount(0, 0);
+            return;
+        }
+        
+        const searchTerm = this.searchTerm.toLowerCase();
+        let totalMatches = 0;
+        let totalTasks = 0;
+        
+        // If no search term, show all tasks
+        if (!searchTerm) {
+            document.querySelectorAll('.task-tile').forEach(task => {
+                task.classList.remove('search-hidden');
+                this.removeSearchHighlights(task);
+            });
+            this.updateSearchResultsCount(0, 0);
+            this.updateTaskCounters();
+            return;
+        }
+        
+        // Search through all tasks
+        document.querySelectorAll('.task-tile').forEach(taskElement => {
+            totalTasks++;
+            const taskId = taskElement.getAttribute('data-task-id');
+            const task = this.findTaskById(taskId);
+            
+            if (task && this.matchesSearchTerm(task, searchTerm)) {
+                taskElement.classList.remove('search-hidden');
+                this.highlightSearchMatches(taskElement, task, searchTerm);
+                totalMatches++;
+            } else {
+                taskElement.classList.add('search-hidden');
+                this.removeSearchHighlights(taskElement);
+            }
+        });
+        
+        this.updateSearchResultsCount(totalMatches, totalTasks);
+        this.updateTaskCounters();
+    }
+    
+    matchesSearchTerm(task, searchTerm) {
+        // Search in task title
+        if (task.title && task.title.toLowerCase().includes(searchTerm)) {
+            return true;
+        }
+        
+        // Search in task description
+        if (task.description && task.description.toLowerCase().includes(searchTerm)) {
+            return true;
+        }
+        
+        // Search in story points
+        if (task.story_points && task.story_points.toString().includes(searchTerm)) {
+            return true;
+        }
+        
+        return false;
+    }
+    
+    highlightSearchMatches(taskElement, task, searchTerm) {
+        // Remove existing highlights
+        this.removeSearchHighlights(taskElement);
+        
+        // Highlight title matches
+        const titleElement = taskElement.querySelector('.task-title');
+        if (titleElement && task.title && task.title.toLowerCase().includes(searchTerm)) {
+            titleElement.innerHTML = this.highlightText(task.title, searchTerm);
+        }
+        
+        // Highlight description matches
+        const descElement = taskElement.querySelector('.task-description');
+        if (descElement && task.description && task.description.toLowerCase().includes(searchTerm)) {
+            descElement.innerHTML = this.highlightText(task.description, searchTerm);
+        }
+    }
+    
+    highlightText(text, searchTerm) {
+        if (!text || !searchTerm) return text;
+        
+        const regex = new RegExp(`(${this.escapeRegExp(searchTerm)})`, 'gi');
+        return text.replace(regex, '<span class="search-highlight">$1</span>');
+    }
+    
+    escapeRegExp(string) {
+        return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    }
+    
+    removeSearchHighlights(taskElement) {
+        const highlightedElements = taskElement.querySelectorAll('.search-highlight');
+        highlightedElements.forEach(element => {
+            element.outerHTML = element.innerHTML;
+        });
+    }
+    
+    findTaskById(taskId) {
+        if (!this.currentBoard || !this.currentBoard.columns) return null;
+        
+        for (const column of this.currentBoard.columns) {
+            const task = column.tasks.find(t => t.id === taskId);
+            if (task) return task;
+        }
+        return null;
+    }
+    
+    updateSearchResultsCount(matches, total) {
+        const countElement = document.getElementById('search-results-count');
+        if (matches === 0 && total === 0) {
+            countElement.textContent = '';
+        } else if (matches === total) {
+            countElement.textContent = `Showing all ${total} tasks`;
+        } else {
+            countElement.textContent = `Found ${matches} of ${total} tasks`;
+        }
+    }
+    
+    updateTaskCounters() {
+        // Update task counters for each column based on visible tasks
+        document.querySelectorAll('.column').forEach(columnElement => {
+            const taskList = columnElement.querySelector('.task-list');
+            const visibleTasks = taskList.querySelectorAll('.task-tile:not(.search-hidden)');
+            const counter = columnElement.querySelector('.task-counter');
+            if (counter) {
+                counter.textContent = visibleTasks.length;
+            }
+        });
+    }
+    
+    clearSearch() {
+        document.getElementById('task-search').value = '';
+        this.searchTerm = '';
+        this.performSearch();
+        this.updateClearButtonVisibility();
+    }
+    
+    updateClearButtonVisibility() {
+        const clearBtn = document.getElementById('clear-search');
+        if (this.searchTerm) {
+            clearBtn.classList.add('visible');
+        } else {
+            clearBtn.classList.remove('visible');
+        }
+    }
+    
+    showSearchContainer() {
+        const searchContainer = document.querySelector('.search-container');
+        if (searchContainer) {
+            searchContainer.classList.add('visible');
+        }
+    }
+    
+    hideSearchContainer() {
+        const searchContainer = document.querySelector('.search-container');
+        if (searchContainer) {
+            searchContainer.classList.remove('visible');
+            // Clear search when hiding
+            this.clearSearch();
+        }
+    }
+    
+    // Helper method to reapply search after board updates
+    reapplySearchIfActive() {
+        if (this.searchTerm) {
+            document.getElementById('task-search').value = this.searchTerm;
+            setTimeout(() => {
+                this.performSearch();
+                this.updateClearButtonVisibility();
+            }, 100); // Small delay to ensure DOM is updated
+        }
+    }
+    
     async loadBoards() {
         try {
             this.showLoading();
@@ -218,16 +420,23 @@ class TaskTilesApp {
                 <p>Choose a board from the dropdown above or create a new one</p>
             </div>
         `;
+        this.hideSearchContainer();
     }
     
     renderBoard() {
         const board = document.getElementById('board');
         board.innerHTML = '';
         
+        // Clear search when switching boards
+        this.clearSearch();
+        
         if (!this.currentBoard || !this.currentBoard.columns) {
             this.showEmptyState();
             return;
         }
+        
+        // Show search container since we have a board loaded
+        this.showSearchContainer();
         
         this.currentBoard.columns.forEach(column => {
             const columnElement = this.createColumnElement(column);
@@ -235,6 +444,9 @@ class TaskTilesApp {
         });
         
         this.setupDragAndDrop();
+        
+        // Initialize search state for the new board
+        this.updateSearchResultsCount(0, 0);
     }
     
     createColumnElement(column) {
@@ -510,6 +722,7 @@ class TaskTilesApp {
             document.getElementById('task-modal').style.display = 'none';
             this.showToast('Task created successfully', 'success');
             await this.loadBoard(this.currentBoard.id);
+            this.reapplySearchIfActive();
         } catch (error) {
             this.showToast('Failed to create task', 'error');
         }
@@ -541,6 +754,7 @@ class TaskTilesApp {
             document.getElementById('edit-task-modal').style.display = 'none';
             this.showToast('Task updated successfully', 'success');
             await this.loadBoard(this.currentBoard.id);
+            this.reapplySearchIfActive();
         } catch (error) {
             this.showToast('Failed to update task', 'error');
         }
@@ -555,6 +769,7 @@ class TaskTilesApp {
             
             this.showToast('Task moved successfully', 'success');
             await this.loadBoard(this.currentBoard.id);
+            this.reapplySearchIfActive();
         } catch (error) {
             this.showToast('Failed to move task', 'error');
         }
@@ -570,6 +785,7 @@ class TaskTilesApp {
             
             this.showToast('Task deleted successfully', 'success');
             await this.loadBoard(this.currentBoard.id);
+            this.reapplySearchIfActive();
         } catch (error) {
             this.showToast('Failed to delete task', 'error');
         }

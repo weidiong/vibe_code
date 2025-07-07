@@ -28,12 +28,24 @@
 
     <main class="main-container">
         <div class="board-controls">
-            <button id="add-column-btn" class="btn btn-primary">
-                <i class="fas fa-plus"></i> Add Column
-            </button>
-            <button id="reset-board-btn" class="btn btn-secondary">
-                <i class="fas fa-refresh"></i> Reset Board
-            </button>
+            <div class="search-container">
+                <div class="search-input-wrapper">
+                    <i class="fas fa-search search-icon"></i>
+                    <input type="text" id="task-search" placeholder="Search tasks..." class="search-input">
+                    <button id="clear-search" class="clear-search-btn" title="Clear search">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div id="search-results-count" class="search-results-count"></div>
+            </div>
+            <div class="action-buttons">
+                <button id="add-column-btn" class="btn btn-primary">
+                    <i class="fas fa-plus"></i> Add Column
+                </button>
+                <button id="reset-board-btn" class="btn btn-secondary">
+                    <i class="fas fa-refresh"></i> Reset Board
+                </button>
+            </div>
         </div>
 
         <div id="board" class="board">

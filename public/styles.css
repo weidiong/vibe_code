@@ -439,12 +439,16 @@ body {
     padding: 1.25rem;
     margin-bottom: 1rem;
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
-    cursor: move;
+    cursor: grab;
     transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
     border-left: 4px solid #3b82f6;
     border: 1px solid rgba(209, 213, 219, 0.6);
     position: relative;
     overflow: hidden;
+    user-select: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
 }
 
 .task-tile::before {
@@ -516,6 +520,21 @@ body {
     justify-content: flex-end;
     gap: 0.5rem;
     margin-top: 0.75rem;
+    pointer-events: auto;
+}
+
+.task-tile[draggable="true"] {
+    cursor: grab;
+}
+
+.task-tile[draggable="true"]:active {
+    cursor: grabbing;
+}
+
+.task-actions button {
+    pointer-events: auto;
+    z-index: 10;
+    position: relative;
 }
 
 .btn-icon {

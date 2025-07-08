@@ -1053,61 +1053,59 @@ class TaskTilesApp {
     }
     
     setupDragAndDrop() {
-        // Task drag events
-        document.querySelectorAll('.task-tile').forEach(task => {
-            // Add click event listeners for edit/delete buttons
-            const editBtn = task.querySelector('[data-action="edit-task"]');
-            const deleteBtn = task.querySelector('[data-action="delete-task"]');
-            
-            if (editBtn) {
-                editBtn.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    e.preventDefault();
-                    this.showEditTaskModal(editBtn.dataset.taskId);
-                });
-                // Prevent dragging when clicking buttons
-                editBtn.addEventListener('mousedown', (e) => {
-                    e.stopPropagation();
-                });
+        // Remove existing drag listeners to avoid duplicates
+        document.removeEventListener('dragstart', this.handleDragStart);
+        document.removeEventListener('dragend', this.handleDragEnd);
+        document.removeEventListener('click', this.handleTaskButtonClick);
+        
+        // Use event delegation for task drag events
+        this.handleDragStart = (e) => {
+            const taskTile = e.target.closest('.task-tile');
+            if (taskTile && e.target.tagName !== 'BUTTON' && !e.target.closest('button')) {
+                this.draggedTask = taskTile;
+                taskTile.classList.add('dragging');
+                e.dataTransfer.effectAllowed = 'move';
+                e.dataTransfer.setData('text/html', taskTile.outerHTML);
+                e.dataTransfer.setData('text/plain', taskTile.getAttribute('data-task-id'));
+                console.log('Drag started for task:', taskTile.getAttribute('data-task-id'));
             }
-            
-            if (deleteBtn) {
-                deleteBtn.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    e.preventDefault();
-                    this.deleteTask(deleteBtn.dataset.taskId);
-                });
-                // Prevent dragging when clicking buttons
-                deleteBtn.addEventListener('mousedown', (e) => {
-                    e.stopPropagation();
-                });
+        };
+        
+        this.handleDragEnd = (e) => {
+            const taskTile = e.target.closest('.task-tile');
+            if (taskTile) {
+                taskTile.classList.remove('dragging');
+                console.log('Drag ended for task:', taskTile.getAttribute('data-task-id'));
             }
+            this.draggedTask = null;
             
-            task.addEventListener('dragstart', (e) => {
-                // Ensure we're dragging the task tile, not a child element
-                const taskTile = e.target.closest('.task-tile');
-                if (taskTile) {
-                    this.draggedTask = taskTile;
-                    taskTile.classList.add('dragging');
-                    e.dataTransfer.effectAllowed = 'move';
-                    e.dataTransfer.setData('text/html', taskTile.outerHTML);
-                    e.dataTransfer.setData('text/plain', taskTile.getAttribute('data-task-id'));
-                }
+            // Remove any lingering dragover classes
+            document.querySelectorAll('.task-list.dragover').forEach(el => {
+                el.classList.remove('dragover');
             });
-            
-            task.addEventListener('dragend', (e) => {
-                const taskTile = e.target.closest('.task-tile');
-                if (taskTile) {
-                    taskTile.classList.remove('dragging');
-                }
-                this.draggedTask = null;
+        };
+        
+        this.handleTaskButtonClick = (e) => {
+            const button = e.target.closest('[data-action]');
+            if (button) {
+                e.stopPropagation();
+                e.preventDefault();
                 
-                // Remove any lingering dragover classes
-                document.querySelectorAll('.task-list.dragover').forEach(el => {
-                    el.classList.remove('dragover');
-                });
-            });
-        });
+                const action = button.getAttribute('data-action');
+                const taskId = button.getAttribute('data-task-id');
+                
+                if (action === 'edit-task') {
+                    this.showEditTaskModal(taskId);
+                } else if (action === 'delete-task') {
+                    this.deleteTask(taskId);
+                }
+            }
+        };
+        
+        // Attach event listeners with delegation
+        document.addEventListener('dragstart', this.handleDragStart.bind(this));
+        document.addEventListener('dragend', this.handleDragEnd.bind(this));
+        document.addEventListener('click', this.handleTaskButtonClick.bind(this));
         
         // Column drop events - handle both task-list and drop-zone
         document.querySelectorAll('.task-list, .drop-zone').forEach(dropTarget => {

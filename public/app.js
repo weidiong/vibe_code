@@ -1061,13 +1061,19 @@ class TaskTilesApp {
         // Use event delegation for task drag events
         this.handleDragStart = (e) => {
             const taskTile = e.target.closest('.task-tile');
-            if (taskTile && e.target.tagName !== 'BUTTON' && !e.target.closest('button')) {
+            const isButton = e.target.tagName === 'BUTTON' || e.target.closest('button') || e.target.closest('.task-actions');
+            
+            if (taskTile && !isButton) {
                 this.draggedTask = taskTile;
                 taskTile.classList.add('dragging');
                 e.dataTransfer.effectAllowed = 'move';
                 e.dataTransfer.setData('text/html', taskTile.outerHTML);
                 e.dataTransfer.setData('text/plain', taskTile.getAttribute('data-task-id'));
                 console.log('Drag started for task:', taskTile.getAttribute('data-task-id'));
+            } else if (isButton) {
+                // Prevent drag when clicking buttons
+                e.preventDefault();
+                e.stopPropagation();
             }
         };
         

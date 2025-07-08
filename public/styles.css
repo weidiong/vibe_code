@@ -480,6 +480,7 @@ body {
     justify-content: space-between;
     align-items: flex-start;
     margin-bottom: 0.75rem;
+    pointer-events: none;
 }
 
 .task-title {
@@ -488,6 +489,7 @@ body {
     margin: 0;
     flex: 1;
     font-size: 1rem;
+    pointer-events: none;
 }
 
 .story-points {
@@ -502,6 +504,7 @@ body {
     box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
     flex-shrink: 0;
     margin-left: 0.5rem;
+    pointer-events: none;
 }
 
 .task-description {
@@ -509,6 +512,7 @@ body {
     font-size: 0.9rem;
     line-height: 1.5;
     margin-bottom: 0.75rem;
+    pointer-events: none;
 }
 
 .task-meta {

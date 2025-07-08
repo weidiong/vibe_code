@@ -8,6 +8,12 @@ class TaskTilesApp {
         this.isConnected = true;
         this.searchTerm = '';
         this.allTasks = [];
+        this.aiContext = {
+            type: 'general',
+            id: null,
+            data: null
+        };
+        this.lastAiResponse = null;
         
         this.init();
     }
@@ -94,6 +100,9 @@ class TaskTilesApp {
             e.preventDefault();
             this.updateTask();
         });
+        
+        // AI Assistant Event Listeners
+        this.setupAIEventListeners();
         
         // Modal Close Buttons
         document.querySelectorAll('.close').forEach(closeBtn => {
@@ -372,6 +381,452 @@ class TaskTilesApp {
                 this.performSearch();
                 this.updateClearButtonVisibility();
             }, 100); // Small delay to ensure DOM is updated
+        }
+    }
+    
+    // AI Assistant Methods
+    setupAIEventListeners() {
+        // Main AI helper button in header
+        document.getElementById('ai-board-helper-btn').addEventListener('click', () => {
+            this.showAIAssistant('general', null, '');
+        });
+        
+        // AI modal controls
+        document.getElementById('ai-generate-btn').addEventListener('click', () => {
+            this.generateAIResponse();
+        });
+        
+        document.getElementById('ai-clear-btn').addEventListener('click', () => {
+            this.clearAIPrompt();
+        });
+        
+        document.getElementById('ai-apply-btn').addEventListener('click', () => {
+            this.applyAIResponse();
+        });
+        
+        document.getElementById('ai-regenerate-btn').addEventListener('click', () => {
+            this.generateAIResponse();
+        });
+        
+        // Board creation AI helpers
+        document.getElementById('ai-board-name-btn').addEventListener('click', () => {
+            this.showAIAssistant('board-name', null, 'Suggest a good name for this board');
+        });
+        
+        document.getElementById('ai-board-desc-btn').addEventListener('click', () => {
+            const boardName = document.getElementById('board-name').value;
+            const context = boardName ? `for a board called "${boardName}"` : '';
+            this.showAIAssistant('board-description', null, `Write a description ${context}`);
+        });
+        
+        // Column creation AI helpers
+        document.getElementById('ai-column-name-btn').addEventListener('click', () => {
+            const boardContext = this.currentBoard ? ` for the "${this.currentBoard.name}" board` : '';
+            this.showAIAssistant('column-name', null, `Suggest a column name${boardContext}`);
+        });
+        
+        // Task creation AI helpers
+        document.getElementById('ai-task-title-btn').addEventListener('click', () => {
+            const columnId = document.getElementById('target-column').value;
+            const column = this.findColumnById(columnId);
+            const context = column ? ` for the "${column.name}" column` : '';
+            this.showAIAssistant('task-title', columnId, `Suggest a task title${context}`);
+        });
+        
+        document.getElementById('ai-task-desc-btn').addEventListener('click', () => {
+            const taskTitle = document.getElementById('task-title').value;
+            const context = taskTitle ? ` for a task titled "${taskTitle}"` : '';
+            this.showAIAssistant('task-description', null, `Write a task description${context}`);
+        });
+        
+        document.getElementById('ai-bulk-tasks-btn').addEventListener('click', () => {
+            const columnId = document.getElementById('target-column').value;
+            const column = this.findColumnById(columnId);
+            const context = column ? ` for the "${column.name}" column` : '';
+            this.showAIAssistant('bulk-tasks', columnId, `Generate multiple tasks${context}`);
+        });
+        
+        // Edit task AI helpers
+        document.getElementById('ai-edit-task-title-btn').addEventListener('click', () => {
+            const currentTitle = document.getElementById('edit-task-title').value;
+            const context = currentTitle ? ` (current: "${currentTitle}")` : '';
+            this.showAIAssistant('task-title', null, `Improve this task title${context}`);
+        });
+        
+        document.getElementById('ai-edit-task-desc-btn').addEventListener('click', () => {
+            const taskTitle = document.getElementById('edit-task-title').value;
+            const currentDesc = document.getElementById('edit-task-description').value;
+            let context = '';
+            if (taskTitle) context += ` for "${taskTitle}"`;
+            if (currentDesc) context += ` (current: "${currentDesc}")`;
+            this.showAIAssistant('task-description', null, `Improve this task description${context}`);
+        });
+        
+        // Suggestion buttons
+        document.querySelectorAll('.suggestion-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const prompt = btn.getAttribute('data-prompt');
+                document.getElementById('ai-prompt').value = prompt;
+            });
+        });
+    }
+    
+    showAIAssistant(contextType, contextId = null, defaultPrompt = '') {
+        this.aiContext = {
+            type: contextType,
+            id: contextId,
+            data: this.getContextData(contextType, contextId)
+        };
+        
+        // Update context display
+        document.getElementById('ai-context-text').textContent = this.getContextDisplayText(contextType);
+        document.getElementById('ai-context-type').value = contextType;
+        document.getElementById('ai-context-id').value = contextId || '';
+        
+        // Set default prompt if provided
+        if (defaultPrompt) {
+            document.getElementById('ai-prompt').value = defaultPrompt;
+        }
+        
+        // Clear previous response
+        this.hideAIResponse();
+        
+        // Show modal
+        document.getElementById('ai-assistant-modal').style.display = 'block';
+        document.getElementById('ai-prompt').focus();
+    }
+    
+    getContextDisplayText(contextType) {
+        const contexts = {
+            'general': 'General Assistant',
+            'board-creation': 'Board Creation Helper',
+            'board-name': 'Board Name Suggestions',
+            'board-description': 'Board Description Helper',
+            'column-name': 'Column Name Suggestions',
+            'task-title': 'Task Title Suggestions',
+            'task-description': 'Task Description Helper',
+            'bulk-tasks': 'Bulk Task Generator'
+        };
+        return contexts[contextType] || 'AI Assistant';
+    }
+    
+    getContextData(contextType, contextId) {
+        const data = {
+            boardName: this.currentBoard?.name,
+            boardDescription: this.currentBoard?.description,
+            columns: this.currentBoard?.columns || [],
+            tasks: []
+        };
+        
+        if (contextId && this.currentBoard) {
+            const column = this.findColumnById(contextId);
+            if (column) {
+                data.currentColumn = column.name;
+                data.tasks = column.tasks || [];
+            }
+        }
+        
+        return data;
+    }
+    
+    findColumnById(columnId) {
+        if (!this.currentBoard || !this.currentBoard.columns) return null;
+        return this.currentBoard.columns.find(col => col.id === columnId);
+    }
+    
+    async generateAIResponse() {
+        const prompt = document.getElementById('ai-prompt').value.trim();
+        if (!prompt) {
+            this.showToast('Please enter a prompt first', 'warning');
+            return;
+        }
+        
+        // Show loading state
+        this.showAILoading();
+        
+        try {
+            const response = await this.callAIAPI(prompt);
+            this.displayAIResponse(response);
+            this.lastAiResponse = response;
+            
+            // Check if this is a fallback response due to rate limiting
+            if (response._isFallback && response._fallbackReason === 'rate-limit') {
+                this.showToast('Using smart fallback due to OpenAI rate limits - response is still intelligent!', 'info');
+            }
+        } catch (error) {
+            console.error('AI API Error:', error);
+            
+            if (error.message && error.message.includes('401')) {
+                this.displayAIError('Invalid API key. Please check your OpenAI API key configuration.', 'api-key');
+            } else if (error.message && error.message.includes('403')) {
+                this.displayAIError('API quota exceeded. Please check your OpenAI billing settings.', 'quota');
+            } else {
+                this.displayAIError('Failed to generate AI response. Please try again.', 'general');
+            }
+        }
+    }
+    
+    async callAIAPI(prompt) {
+        // Auto-detect if user wants to generate tasks
+        let contextType = this.aiContext.type;
+        const promptLower = prompt.toLowerCase();
+        
+        // If it's a general context but the prompt is about generating tasks, switch to bulk-tasks
+        if (contextType === 'general' && 
+            (promptLower.includes('generate') || promptLower.includes('create')) && 
+            (promptLower.includes('task') || promptLower.includes('ticket') || promptLower.includes('story'))) {
+            contextType = 'bulk-tasks';
+        }
+        
+        const contextData = {
+            type: contextType,
+            prompt: prompt,
+            context: this.aiContext.data,
+            boardId: this.currentBoard?.id,
+            columnId: this.aiContext.id
+        };
+        
+        const response = await this.apiRequest('/ai/generate', {
+            method: 'POST',
+            body: JSON.stringify(contextData)
+        });
+        
+        return response;
+    }
+    
+    showAILoading() {
+        const responseSection = document.getElementById('ai-response-section');
+        const responseContent = document.getElementById('ai-response-content');
+        
+        responseContent.innerHTML = `
+            <div class="ai-loading">
+                <div class="ai-spinner"></div>
+                <p>AI is thinking...</p>
+            </div>
+        `;
+        
+        responseSection.classList.add('visible');
+    }
+    
+    hideAIResponse() {
+        document.getElementById('ai-response-section').classList.remove('visible');
+    }
+    
+    displayAIResponse(response) {
+        const responseContent = document.getElementById('ai-response-content');
+        
+        if (response.type === 'board') {
+            responseContent.innerHTML = this.formatBoardResponse(response);
+        } else if (response.type === 'tasks') {
+            responseContent.innerHTML = this.formatTasksResponse(response);
+        } else if (response.type === 'text') {
+            responseContent.innerHTML = this.formatTextResponse(response);
+        } else {
+            responseContent.innerHTML = `<p>${response.content || 'AI response received successfully.'}</p>`;
+        }
+    }
+    
+    formatBoardResponse(response) {
+        return `
+            <div class="ai-board-suggestion">
+                <h5>${response.data.name}</h5>
+                <p>${response.data.description}</p>
+                <strong>Suggested Columns:</strong>
+                <ul class="ai-columns-list">
+                    ${response.data.columns.map(col => `<li>${col.name} - ${col.description}</li>`).join('')}
+                </ul>
+            </div>
+        `;
+    }
+    
+    formatTasksResponse(response) {
+        return response.data.tasks.map(task => `
+            <div class="ai-task-suggestion">
+                <h6>${task.title}</h6>
+                <p>${task.description}</p>
+                <div class="ai-task-meta">
+                    <span>Story Points: ${task.story_points || 'Not specified'}</span>
+                    <span>Priority: ${task.priority || 'Medium'}</span>
+                </div>
+            </div>
+        `).join('');
+    }
+    
+    formatTextResponse(response) {
+        return `<p>${response.content}</p>`;
+    }
+    
+    displayAIError(message, errorType = 'general') {
+        const responseContent = document.getElementById('ai-response-content');
+        
+        let icon = 'fas fa-exclamation-triangle';
+        let helpText = '';
+        let retryButton = '';
+        
+        switch (errorType) {
+            case 'rate-limit':
+                icon = 'fas fa-clock';
+                helpText = 'OpenAI free tier allows 3 requests per minute. Please wait before trying again.';
+                retryButton = '<button class="btn btn-primary btn-small" onclick="setTimeout(() => app.generateAIResponse(), 10000)">Retry in 10 seconds</button>';
+                break;
+            case 'api-key':
+                icon = 'fas fa-key';
+                helpText = 'Please check your OpenAI API key in the .env file and restart the application.';
+                break;
+            case 'quota':
+                icon = 'fas fa-credit-card';
+                helpText = 'Your OpenAI account has exceeded its usage quota. Please check your billing settings.';
+                break;
+            default:
+                helpText = 'Please try again. If the problem persists, check your internet connection.';
+                retryButton = '<button class="btn btn-primary btn-small" onclick="app.generateAIResponse()">Try Again</button>';
+        }
+        
+        responseContent.innerHTML = `
+            <div class="ai-error ai-error-${errorType}">
+                <i class="${icon}"></i>
+                <p><strong>${message}</strong></p>
+                <small>${helpText}</small>
+                ${retryButton ? `<div class="ai-error-actions">${retryButton}</div>` : ''}
+            </div>
+        `;
+        document.getElementById('ai-response-section').classList.add('visible');
+    }
+    
+    clearAIPrompt() {
+        document.getElementById('ai-prompt').value = '';
+        this.hideAIResponse();
+        this.lastAiResponse = null;
+    }
+    
+    async applyAIResponse() {
+        if (!this.lastAiResponse) {
+            this.showToast('No AI response to apply', 'warning');
+            return;
+        }
+        
+        try {
+            await this.applyAIResponseByType(this.lastAiResponse);
+            document.getElementById('ai-assistant-modal').style.display = 'none';
+            this.showToast('AI suggestions applied successfully!', 'success');
+        } catch (error) {
+            console.error('Error applying AI response:', error);
+            this.showToast('Failed to apply AI suggestions', 'error');
+        }
+    }
+    
+    async applyAIResponseByType(response) {
+        switch (response.type) {
+            case 'board':
+                await this.applyBoardSuggestion(response.data);
+                break;
+            case 'tasks':
+                await this.applyTasksSuggestion(response.data);
+                break;
+            case 'text':
+                this.applyTextSuggestion(response.content);
+                break;
+            default:
+                this.showToast('Unknown response type', 'warning');
+        }
+    }
+    
+    async applyBoardSuggestion(boardData) {
+        // Create the board
+        const boardResponse = await this.apiRequest('/boards', {
+            method: 'POST',
+            body: JSON.stringify({
+                name: boardData.name,
+                description: boardData.description
+            })
+        });
+        
+        // Create suggested columns
+        if (boardData.columns && boardData.columns.length > 0) {
+            for (const column of boardData.columns) {
+                await this.apiRequest('/columns', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        board_id: boardResponse.id,
+                        name: column.name,
+                        color: column.color || '#667eea'
+                    })
+                });
+            }
+        }
+        
+        await this.loadBoards();
+        document.getElementById('board-select').value = boardResponse.id;
+        await this.loadBoard(boardResponse.id);
+    }
+    
+    async applyTasksSuggestion(tasksData) {
+        let columnId = this.aiContext.id || document.getElementById('target-column').value;
+        
+        // If no column is selected, use the first available column
+        if (!columnId && this.currentBoard && this.currentBoard.columns && this.currentBoard.columns.length > 0) {
+            columnId = this.currentBoard.columns[0].id;
+            this.showToast(`No column selected, adding tasks to "${this.currentBoard.columns[0].name}"`, 'info');
+        }
+        
+        if (!columnId) {
+            this.showToast('Please create a column first or select a board with columns', 'warning');
+            return;
+        }
+        
+        if (!tasksData || !tasksData.tasks || !Array.isArray(tasksData.tasks)) {
+            this.showToast('Invalid task data received from AI', 'error');
+            return;
+        }
+        
+        // Create all suggested tasks
+        let createdCount = 0;
+        for (const task of tasksData.tasks) {
+            try {
+                await this.apiRequest('/tasks', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        column_id: columnId,
+                        board_id: this.currentBoard.id,
+                        title: task.title,
+                        description: task.description,
+                        story_points: task.story_points
+                    })
+                });
+                createdCount++;
+            } catch (error) {
+                console.error('Error creating task:', error);
+                this.showToast(`Failed to create task: ${task.title}`, 'error');
+            }
+        }
+        
+        if (createdCount > 0) {
+            this.showToast(`Successfully created ${createdCount} task${createdCount > 1 ? 's' : ''}!`, 'success');
+            await this.loadBoard(this.currentBoard.id);
+            this.reapplySearchIfActive();
+        }
+    }
+    
+    applyTextSuggestion(text) {
+        // Apply text to the appropriate field based on context
+        switch (this.aiContext.type) {
+            case 'board-name':
+                document.getElementById('board-name').value = text;
+                break;
+            case 'board-description':
+                document.getElementById('board-description').value = text;
+                break;
+            case 'column-name':
+                document.getElementById('column-name').value = text;
+                break;
+            case 'task-title':
+                const titleField = document.getElementById('edit-task-title') || document.getElementById('task-title');
+                if (titleField) titleField.value = text;
+                break;
+            case 'task-description':
+                const descField = document.getElementById('edit-task-description') || document.getElementById('task-description');
+                if (descField) descField.value = text;
+                break;
         }
     }
     

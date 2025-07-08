@@ -133,26 +133,11 @@
             <span class="close">&times;</span>
             <h2>Add New Task</h2>
             <form id="task-form">
-                <div class="form-group-with-ai">
-                    <input type="text" id="task-title" placeholder="Task Title" required>
-                    <button type="button" id="ai-task-title-btn" class="ai-helper-btn" title="Get AI suggestions for task title">
-                        <i class="fas fa-robot"></i>
-                    </button>
-                </div>
-                <div class="form-group-with-ai">
-                    <textarea id="task-description" placeholder="Task Description (optional)" rows="3"></textarea>
-                    <button type="button" id="ai-task-desc-btn" class="ai-helper-btn" title="Get AI help with task description">
-                        <i class="fas fa-robot"></i>
-                    </button>
-                </div>
+                <input type="text" id="task-title" placeholder="Task Title" required>
+                <textarea id="task-description" placeholder="Task Description (optional)" rows="3"></textarea>
                 <label for="task-story-points">Story Points:</label>
                 <input type="number" id="task-story-points" placeholder="Story Points" min="0" max="100" step="1">
                 <input type="hidden" id="target-column">
-                <div class="ai-bulk-tasks">
-                    <button type="button" id="ai-bulk-tasks-btn" class="btn btn-warning">
-                        <i class="fas fa-robot"></i> Generate Multiple Tasks with AI
-                    </button>
-                </div>
                 <button type="submit" class="btn btn-primary">Add Task</button>
             </form>
         </div>
@@ -164,18 +149,8 @@
             <span class="close">&times;</span>
             <h2>Edit Task</h2>
             <form id="edit-task-form">
-                <div class="form-group-with-ai">
-                    <input type="text" id="edit-task-title" placeholder="Task Title" required>
-                    <button type="button" id="ai-edit-task-title-btn" class="ai-helper-btn" title="Get AI suggestions for task title">
-                        <i class="fas fa-robot"></i>
-                    </button>
-                </div>
-                <div class="form-group-with-ai">
-                    <textarea id="edit-task-description" placeholder="Task Description (optional)" rows="3"></textarea>
-                    <button type="button" id="ai-edit-task-desc-btn" class="ai-helper-btn" title="Get AI help with task description">
-                        <i class="fas fa-robot"></i>
-                    </button>
-                </div>
+                <input type="text" id="edit-task-title" placeholder="Task Title" required>
+                <textarea id="edit-task-description" placeholder="Task Description (optional)" rows="3"></textarea>
                 <label for="edit-task-story-points">Story Points:</label>
                 <input type="number" id="edit-task-story-points" placeholder="Story Points" min="0" max="100" step="1">
                 <input type="hidden" id="edit-task-id">

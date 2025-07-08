@@ -425,42 +425,7 @@ class TaskTilesApp {
             this.showAIAssistant('column-name', null, `Suggest a column name${boardContext}`);
         });
         
-        // Task creation AI helpers
-        document.getElementById('ai-task-title-btn').addEventListener('click', () => {
-            const columnId = document.getElementById('target-column').value;
-            const column = this.findColumnById(columnId);
-            const context = column ? ` for the "${column.name}" column` : '';
-            this.showAIAssistant('task-title', columnId, `Suggest a task title${context}`);
-        });
-        
-        document.getElementById('ai-task-desc-btn').addEventListener('click', () => {
-            const taskTitle = document.getElementById('task-title').value;
-            const context = taskTitle ? ` for a task titled "${taskTitle}"` : '';
-            this.showAIAssistant('task-description', null, `Write a task description${context}`);
-        });
-        
-        document.getElementById('ai-bulk-tasks-btn').addEventListener('click', () => {
-            const columnId = document.getElementById('target-column').value;
-            const column = this.findColumnById(columnId);
-            const context = column ? ` for the "${column.name}" column` : '';
-            this.showAIAssistant('bulk-tasks', columnId, `Generate multiple tasks${context}`);
-        });
-        
-        // Edit task AI helpers
-        document.getElementById('ai-edit-task-title-btn').addEventListener('click', () => {
-            const currentTitle = document.getElementById('edit-task-title').value;
-            const context = currentTitle ? ` (current: "${currentTitle}")` : '';
-            this.showAIAssistant('task-title', null, `Improve this task title${context}`);
-        });
-        
-        document.getElementById('ai-edit-task-desc-btn').addEventListener('click', () => {
-            const taskTitle = document.getElementById('edit-task-title').value;
-            const currentDesc = document.getElementById('edit-task-description').value;
-            let context = '';
-            if (taskTitle) context += ` for "${taskTitle}"`;
-            if (currentDesc) context += ` (current: "${currentDesc}")`;
-            this.showAIAssistant('task-description', null, `Improve this task description${context}`);
-        });
+
         
         // Suggestion buttons
         document.querySelectorAll('.suggestion-btn').forEach(btn => {
@@ -1049,7 +1014,9 @@ class TaskTilesApp {
             </div>
             <div class="task-list" data-column-id="${column.id}">
                 ${tasks.map(task => this.createTaskElement(task)).join('')}
-                ${tasks.length === 0 ? '<div class="drop-zone">Drop tasks here or click "Add Task" to create new ones</div>' : ''}
+                <div class="drop-zone ${tasks.length > 0 ? 'with-tasks' : ''}">
+                    ${tasks.length === 0 ? 'Drop tasks here or click "Add Task" to create new ones' : 'Drop tasks here'}
+                </div>
             </div>
         `;
         
@@ -1095,53 +1062,89 @@ class TaskTilesApp {
             if (editBtn) {
                 editBtn.addEventListener('click', (e) => {
                     e.stopPropagation();
+                    e.preventDefault();
                     this.showEditTaskModal(editBtn.dataset.taskId);
+                });
+                // Prevent dragging when clicking buttons
+                editBtn.addEventListener('mousedown', (e) => {
+                    e.stopPropagation();
                 });
             }
             
             if (deleteBtn) {
                 deleteBtn.addEventListener('click', (e) => {
                     e.stopPropagation();
+                    e.preventDefault();
                     this.deleteTask(deleteBtn.dataset.taskId);
+                });
+                // Prevent dragging when clicking buttons
+                deleteBtn.addEventListener('mousedown', (e) => {
+                    e.stopPropagation();
                 });
             }
             
             task.addEventListener('dragstart', (e) => {
-                this.draggedTask = e.target;
-                e.target.classList.add('dragging');
-                e.dataTransfer.effectAllowed = 'move';
-                e.dataTransfer.setData('text/html', e.target.outerHTML);
+                // Ensure we're dragging the task tile, not a child element
+                const taskTile = e.target.closest('.task-tile');
+                if (taskTile) {
+                    this.draggedTask = taskTile;
+                    taskTile.classList.add('dragging');
+                    e.dataTransfer.effectAllowed = 'move';
+                    e.dataTransfer.setData('text/html', taskTile.outerHTML);
+                    e.dataTransfer.setData('text/plain', taskTile.getAttribute('data-task-id'));
+                }
             });
             
             task.addEventListener('dragend', (e) => {
-                e.target.classList.remove('dragging');
+                const taskTile = e.target.closest('.task-tile');
+                if (taskTile) {
+                    taskTile.classList.remove('dragging');
+                }
                 this.draggedTask = null;
+                
+                // Remove any lingering dragover classes
+                document.querySelectorAll('.task-list.dragover').forEach(el => {
+                    el.classList.remove('dragover');
+                });
             });
         });
         
-        // Column drop events
-        document.querySelectorAll('.task-list').forEach(taskList => {
-            taskList.addEventListener('dragover', (e) => {
+        // Column drop events - handle both task-list and drop-zone
+        document.querySelectorAll('.task-list, .drop-zone').forEach(dropTarget => {
+            dropTarget.addEventListener('dragover', (e) => {
                 e.preventDefault();
                 e.dataTransfer.dropEffect = 'move';
-                taskList.classList.add('dragover');
+                
+                // Add visual feedback to the appropriate container
+                const taskList = dropTarget.classList.contains('task-list') ? dropTarget : dropTarget.closest('.task-list');
+                if (taskList) {
+                    taskList.classList.add('dragover');
+                }
             });
             
-            taskList.addEventListener('dragleave', (e) => {
-                if (!taskList.contains(e.relatedTarget)) {
+            dropTarget.addEventListener('dragleave', (e) => {
+                const taskList = dropTarget.classList.contains('task-list') ? dropTarget : dropTarget.closest('.task-list');
+                if (taskList && !taskList.contains(e.relatedTarget)) {
                     taskList.classList.remove('dragover');
                 }
             });
             
-            taskList.addEventListener('drop', (e) => {
+            dropTarget.addEventListener('drop', (e) => {
                 e.preventDefault();
-                taskList.classList.remove('dragover');
+                
+                // Remove visual feedback
+                const taskList = dropTarget.classList.contains('task-list') ? dropTarget : dropTarget.closest('.task-list');
+                if (taskList) {
+                    taskList.classList.remove('dragover');
+                }
                 
                 if (this.draggedTask) {
                     const taskId = this.draggedTask.getAttribute('data-task-id');
-                    const newColumnId = taskList.getAttribute('data-column-id');
+                    const newColumnId = taskList ? taskList.getAttribute('data-column-id') : null;
                     
-                    this.moveTask(taskId, newColumnId);
+                    if (newColumnId) {
+                        this.moveTask(taskId, newColumnId);
+                    }
                 }
             });
         });

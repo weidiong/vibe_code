@@ -332,17 +332,19 @@ app.post('/api/ai/generate', [
   try {
     const { type, prompt, context, boardId, columnId } = req.body;
     
-    // Check if OpenAI API key is configured
+    // Check if AI API key is configured (support both OpenAI and Gemini)
     const openAIKey = process.env.OPENAI_API_KEY;
-    if (!openAIKey) {
+    const geminiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
+    
+    if (!openAIKey && !geminiKey) {
       return res.status(503).json({ 
-        error: 'OpenAI API key not configured',
-        message: 'Please set the OPENAI_API_KEY environment variable to enable AI features.'
+        error: 'AI API key not configured',
+        message: 'Please set either OPENAI_API_KEY or GEMINI_API_KEY environment variable to enable AI features.'
       });
     }
     
-    // Call OpenAI API
-    const response = await callOpenAI(type, prompt, context);
+    // Call appropriate AI API
+    const response = geminiKey ? await callGemini(type, prompt, context) : await callOpenAI(type, prompt, context);
     
     res.json(response);
   } catch (error) {
@@ -352,15 +354,15 @@ app.post('/api/ai/generate', [
     if (error.message.includes('429') || error.message.includes('Too Many Requests')) {
       return res.status(429).json({ 
         error: 'Rate limit exceeded',
-        message: 'Too many AI requests. Please wait a moment and try again. Free tier allows 3 requests per minute.'
+        message: 'Too many AI requests. Please wait a moment and try again.'
       });
     }
     
     // Handle invalid API key errors
     if (error.message.includes('401') || error.message.includes('Unauthorized') || error.message.includes('Invalid API key')) {
       return res.status(401).json({ 
-        error: 'Invalid OpenAI API key',
-        message: 'Please check your OpenAI API key configuration.'
+        error: 'Invalid AI API key',
+        message: 'Please check your AI API key configuration.'
       });
     }
     
@@ -368,7 +370,7 @@ app.post('/api/ai/generate', [
     if (error.message.includes('403') || error.message.includes('quota')) {
       return res.status(403).json({ 
         error: 'API quota exceeded',
-        message: 'OpenAI API quota exceeded. Please check your billing settings.'
+        message: 'AI API quota exceeded. Please check your billing settings.'
       });
     }
     
@@ -396,6 +398,142 @@ app.use((error, req, res, next) => {
 });
 
 // Start server
+// Function to call Gemini AI API
+async function callGemini(type, prompt, context) {
+  try {
+    const geminiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
+    if (!geminiKey) {
+      throw new Error('Gemini API key not configured');
+    }
+
+    const systemPrompt = getSystemPrompt(type);
+    const fullPrompt = `${systemPrompt}\n\nUser Request: ${prompt}`;
+    
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${geminiKey}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        contents: [{
+          parts: [{
+            text: fullPrompt
+          }]
+        }],
+        generationConfig: {
+          temperature: 0.7,
+          topK: 40,
+          topP: 0.95,
+          maxOutputTokens: 2048,
+        }
+      })
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(`HTTP ${response.status}: ${errorData.error?.message || 'Unknown error'}`);
+    }
+
+    const data = await response.json();
+    const content = data.candidates?.[0]?.content?.parts?.[0]?.text;
+
+    if (!content) {
+      throw new Error('No content in Gemini response');
+    }
+
+    // Try to parse as JSON for structured responses
+    if (type === 'bulk-tasks' || type === 'board-creation' || type === 'board-with-tasks') {
+      try {
+        const jsonResponse = JSON.parse(content);
+        
+        // Ensure the response has the correct structure for bulk tasks
+        if (type === 'bulk-tasks') {
+          // If the AI returned a direct tasks array, wrap it properly
+          if (Array.isArray(jsonResponse)) {
+            return {
+              type: 'tasks',
+              data: {
+                tasks: jsonResponse
+              }
+            };
+          }
+          // If it's already properly structured, return as is
+          if (jsonResponse.type === 'tasks' && jsonResponse.data && jsonResponse.data.tasks) {
+            return jsonResponse;
+          }
+          // If it has tasks but wrong structure, fix it
+          if (jsonResponse.tasks) {
+            return {
+              type: 'tasks',
+              data: {
+                tasks: jsonResponse.tasks
+              }
+            };
+          }
+        }
+        
+        // Ensure the response has the correct structure for board-with-tasks
+        if (type === 'board-with-tasks') {
+          // If it's already properly structured, return as is
+          if (jsonResponse.type === 'board-with-tasks' && jsonResponse.data) {
+            return jsonResponse;
+          }
+          // If it has the data but wrong structure, fix it
+          if (jsonResponse.name && jsonResponse.columns) {
+            return {
+              type: 'board-with-tasks',
+              data: {
+                name: jsonResponse.name,
+                description: jsonResponse.description || '',
+                columns: jsonResponse.columns || [],
+                tasks: jsonResponse.tasks || []
+              }
+            };
+          }
+        }
+        
+        return jsonResponse;
+      } catch (e) {
+        // If JSON parsing fails, use intelligent fallback for task types
+        if (type === 'bulk-tasks') {
+          return getIntelligentFallback(prompt, context);
+        }
+        if (type === 'board-with-tasks') {
+          return getBoardWithTasksFallback(prompt, context);
+        }
+        throw e;
+      }
+    }
+
+    // For non-structured responses, return as text
+    // But if it's a bulk-tasks request, try to parse natural language into tasks
+    if (type === 'bulk-tasks') {
+      return parseNaturalLanguageIntoTasks(content, context);
+    }
+    
+    // If it's a board-with-tasks request, try to parse natural language into board
+    if (type === 'board-with-tasks') {
+      return parseNaturalLanguageIntoBoard(content, context);
+    }
+    
+    return {
+      type: 'text',
+      content: content.trim()
+    };
+
+  } catch (error) {
+    console.error('Gemini API error:', error);
+    
+    // Handle rate limiting gracefully
+    if (error.message.includes('429') || error.message.includes('Too Many Requests')) {
+      console.log('Rate limit hit, using intelligent fallback');
+      return getIntelligentFallback(prompt, context);
+    }
+    
+    throw error;
+  }
+}
+
 // Function to call OpenAI API with rate limit fallback
 async function callOpenAI(type, prompt, context) {
   try {
@@ -737,13 +875,73 @@ function getBoardWithTasksFallback(prompt, context = {}) {
   // Extract project type from prompt
   const promptLower = prompt.toLowerCase();
   let projectType = 'Project';
+  let columns = [];
+  let tasks = [];
   
-  if (promptLower.includes('software') || promptLower.includes('app') || promptLower.includes('development')) {
+  if (promptLower.includes('sales') || promptLower.includes('campaign')) {
+    projectType = 'Sales Campaign';
+    columns = [
+      { name: 'Planning', description: 'Campaign planning and strategy', color: '#8b5cf6' },
+      { name: 'In Progress', description: 'Active campaign activities', color: '#f59e0b' },
+      { name: 'Review', description: 'Content and materials review', color: '#06b6d4' },
+      { name: 'Launched', description: 'Live campaigns and completed tasks', color: '#10b981' }
+    ];
+    tasks = [
+      { title: 'Market Research', description: 'Research target audience and competitors', story_points: 5, priority: 'High' },
+      { title: 'Campaign Strategy', description: 'Develop overall campaign strategy and goals', story_points: 8, priority: 'High' },
+      { title: 'Content Creation', description: 'Create marketing materials and content', story_points: 13, priority: 'High' },
+      { title: 'Lead Generation Setup', description: 'Set up lead capture and tracking systems', story_points: 5, priority: 'Medium' },
+      { title: 'Email Marketing', description: 'Create and schedule email campaigns', story_points: 8, priority: 'Medium' },
+      { title: 'Social Media Campaign', description: 'Launch social media promotional content', story_points: 5, priority: 'Medium' },
+      { title: 'Analytics Setup', description: 'Configure tracking and analytics', story_points: 3, priority: 'Medium' },
+      { title: 'Campaign Launch', description: 'Go live with the sales campaign', story_points: 3, priority: 'High' }
+    ];
+  } else if (promptLower.includes('software') || promptLower.includes('app') || promptLower.includes('development')) {
     projectType = 'Software Development';
-  } else if (promptLower.includes('marketing') || promptLower.includes('campaign')) {
+    columns = [
+      { name: 'Backlog', description: 'Feature backlog and ideas', color: '#6b7280' },
+      { name: 'To Do', description: 'Ready for development', color: '#3b82f6' },
+      { name: 'In Progress', description: 'Currently developing', color: '#f59e0b' },
+      { name: 'Testing', description: 'In QA and testing', color: '#8b5cf6' },
+      { name: 'Done', description: 'Completed and deployed', color: '#10b981' }
+    ];
+    tasks = [
+      { title: 'Project Setup', description: 'Initialize repository and development environment', story_points: 3, priority: 'High' },
+      { title: 'Database Design', description: 'Design database schema and relationships', story_points: 8, priority: 'High' },
+      { title: 'API Development', description: 'Build REST API endpoints', story_points: 13, priority: 'High' },
+      { title: 'Frontend Framework', description: 'Set up frontend framework and routing', story_points: 5, priority: 'Medium' },
+      { title: 'User Authentication', description: 'Implement user registration and login', story_points: 8, priority: 'High' },
+      { title: 'UI Components', description: 'Create reusable UI components', story_points: 8, priority: 'Medium' }
+    ];
+  } else if (promptLower.includes('marketing')) {
     projectType = 'Marketing Campaign';
-  } else if (promptLower.includes('design') || promptLower.includes('ui') || promptLower.includes('ux')) {
-    projectType = 'Design Project';
+    columns = [
+      { name: 'Planning', description: 'Strategy and planning', color: '#8b5cf6' },
+      { name: 'Creative', description: 'Content and creative development', color: '#f59e0b' },
+      { name: 'Review', description: 'Approval and review process', color: '#06b6d4' },
+      { name: 'Live', description: 'Active campaigns', color: '#10b981' }
+    ];
+    tasks = [
+      { title: 'Brand Guidelines', description: 'Establish brand guidelines and messaging', story_points: 5, priority: 'High' },
+      { title: 'Content Calendar', description: 'Plan content calendar and posting schedule', story_points: 3, priority: 'High' },
+      { title: 'Social Media Strategy', description: 'Develop social media marketing strategy', story_points: 8, priority: 'Medium' },
+      { title: 'Ad Creative Design', description: 'Design advertising creatives and banners', story_points: 8, priority: 'Medium' },
+      { title: 'Influencer Outreach', description: 'Identify and contact potential influencers', story_points: 5, priority: 'Low' }
+    ];
+  } else {
+    // Default project
+    columns = [
+      { name: 'Backlog', description: 'Ideas and future tasks', color: '#6b7280' },
+      { name: 'To Do', description: 'Tasks ready to start', color: '#3b82f6' },
+      { name: 'In Progress', description: 'Active work items', color: '#f59e0b' },
+      { name: 'Done', description: 'Completed tasks', color: '#10b981' }
+    ];
+    tasks = [
+      { title: 'Project Kickoff', description: 'Initialize project and set up team', story_points: 3, priority: 'High' },
+      { title: 'Requirements Analysis', description: 'Gather and analyze project requirements', story_points: 5, priority: 'High' },
+      { title: 'Planning & Design', description: 'Create project plan and design documents', story_points: 8, priority: 'High' },
+      { title: 'Implementation Phase 1', description: 'Begin core implementation work', story_points: 13, priority: 'Medium' }
+    ];
   }
   
   return {
@@ -751,20 +949,8 @@ function getBoardWithTasksFallback(prompt, context = {}) {
     data: {
       name: `${projectType} Board`,
       description: `Comprehensive project board for ${projectType.toLowerCase()} management`,
-      columns: [
-        { name: 'Backlog', description: 'Ideas and future tasks', color: '#6b7280' },
-        { name: 'To Do', description: 'Tasks ready to start', color: '#3b82f6' },
-        { name: 'In Progress', description: 'Active work items', color: '#f59e0b' },
-        { name: 'Done', description: 'Completed tasks', color: '#10b981' }
-      ],
-      tasks: [
-        { title: 'Project Kickoff', description: 'Initialize project and set up team', story_points: 3, priority: 'High' },
-        { title: 'Requirements Analysis', description: 'Gather and analyze project requirements', story_points: 5, priority: 'High' },
-        { title: 'Planning & Design', description: 'Create project plan and design documents', story_points: 8, priority: 'High' },
-        { title: 'Implementation Phase 1', description: 'Begin core implementation work', story_points: 13, priority: 'Medium' },
-        { title: 'Testing & QA', description: 'Quality assurance and testing', story_points: 5, priority: 'Medium' },
-        { title: 'Documentation', description: 'Create project documentation', story_points: 3, priority: 'Low' }
-      ]
+      columns: columns,
+      tasks: tasks
     }
   };
 }

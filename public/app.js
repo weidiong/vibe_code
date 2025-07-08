@@ -567,15 +567,26 @@ class TaskTilesApp {
     }
     
     async callAIAPI(prompt) {
-        // Auto-detect if user wants to generate tasks
+        // Auto-detect if user wants to generate tasks or create a board
         let contextType = this.aiContext.type;
         const promptLower = prompt.toLowerCase();
         
-        // If it's a general context but the prompt is about generating tasks, switch to bulk-tasks
-        if (contextType === 'general' && 
+        // If no board is selected and user wants to generate tasks, create a board with tasks
+        if (!this.currentBoard && contextType === 'general' && 
+            (promptLower.includes('generate') || promptLower.includes('create')) && 
+            (promptLower.includes('task') || promptLower.includes('ticket') || promptLower.includes('story'))) {
+            contextType = 'board-with-tasks';
+        }
+        // If there's a board and user wants to generate tasks, just create tasks
+        else if (contextType === 'general' && 
             (promptLower.includes('generate') || promptLower.includes('create')) && 
             (promptLower.includes('task') || promptLower.includes('ticket') || promptLower.includes('story'))) {
             contextType = 'bulk-tasks';
+        }
+        // If no board and user wants to create a board, use board creation
+        else if (!this.currentBoard && contextType === 'general' && 
+            (promptLower.includes('board') || promptLower.includes('project'))) {
+            contextType = 'board-creation';
         }
         
         const contextData = {
@@ -617,6 +628,8 @@ class TaskTilesApp {
         
         if (response.type === 'board') {
             responseContent.innerHTML = this.formatBoardResponse(response);
+        } else if (response.type === 'board-with-tasks') {
+            responseContent.innerHTML = this.formatBoardWithTasksResponse(response);
         } else if (response.type === 'tasks') {
             responseContent.innerHTML = this.formatTasksResponse(response);
         } else if (response.type === 'text') {
@@ -635,6 +648,44 @@ class TaskTilesApp {
                 <ul class="ai-columns-list">
                     ${response.data.columns.map(col => `<li>${col.name} - ${col.description}</li>`).join('')}
                 </ul>
+            </div>
+        `;
+    }
+
+    formatBoardWithTasksResponse(response) {
+        const tasksHtml = response.data.tasks ? response.data.tasks.map(task => `
+            <div class="ai-task-suggestion">
+                <h6>${task.title}</h6>
+                <p>${task.description}</p>
+                <div class="ai-task-meta">
+                    <span>Story Points: ${task.story_points || 'Not specified'}</span>
+                    <span>Priority: ${task.priority || 'Medium'}</span>
+                </div>
+            </div>
+        `).join('') : '';
+
+        return `
+            <div class="ai-board-suggestion">
+                <h5>📋 ${response.data.name}</h5>
+                <p>${response.data.description}</p>
+                
+                <div class="ai-board-preview">
+                    <strong>🏛️ Suggested Columns:</strong>
+                    <div class="ai-column-list">
+                        ${response.data.columns.map(col => `<div class="ai-column-item">${col.name}</div>`).join('')}
+                    </div>
+                </div>
+                
+                ${response.data.tasks && response.data.tasks.length > 0 ? `
+                    <div class="ai-task-list">
+                        <strong>✅ Suggested Tasks (${response.data.tasks.length}):</strong>
+                        ${tasksHtml}
+                    </div>
+                ` : ''}
+                
+                <div class="ai-board-summary">
+                    <p><strong>✨ Ready to create:</strong> Complete board with ${response.data.columns.length} columns${response.data.tasks ? ` and ${response.data.tasks.length} tasks` : ''}</p>
+                </div>
             </div>
         `;
     }
@@ -720,6 +771,9 @@ class TaskTilesApp {
             case 'board':
                 await this.applyBoardSuggestion(response.data);
                 break;
+            case 'board-with-tasks':
+                await this.applyBoardWithTasksSuggestion(response.data);
+                break;
             case 'tasks':
                 await this.applyTasksSuggestion(response.data);
                 break;
@@ -758,6 +812,72 @@ class TaskTilesApp {
         await this.loadBoards();
         document.getElementById('board-select').value = boardResponse.id;
         await this.loadBoard(boardResponse.id);
+    }
+
+    async applyBoardWithTasksSuggestion(boardData) {
+        try {
+            // Create the board
+            const boardResponse = await this.apiRequest('/boards', {
+                method: 'POST',
+                body: JSON.stringify({
+                    name: boardData.name,
+                    description: boardData.description
+                })
+            });
+            
+            // Create suggested columns
+            const createdColumns = [];
+            if (boardData.columns && boardData.columns.length > 0) {
+                for (const column of boardData.columns) {
+                    const columnResponse = await this.apiRequest('/columns', {
+                        method: 'POST',
+                        body: JSON.stringify({
+                            board_id: boardResponse.id,
+                            name: column.name,
+                            color: column.color || '#667eea'
+                        })
+                    });
+                    createdColumns.push(columnResponse);
+                }
+            }
+            
+            // Create suggested tasks
+            if (boardData.tasks && boardData.tasks.length > 0) {
+                let taskCount = 0;
+                for (const task of boardData.tasks) {
+                    // Distribute tasks across columns, or use first column if no specific column
+                    const columnIndex = task.column_index || Math.floor(taskCount / Math.ceil(boardData.tasks.length / createdColumns.length));
+                    const targetColumn = createdColumns[columnIndex] || createdColumns[0];
+                    
+                    if (targetColumn) {
+                        await this.apiRequest('/tasks', {
+                            method: 'POST',
+                            body: JSON.stringify({
+                                column_id: targetColumn.id,
+                                board_id: boardResponse.id,
+                                title: task.title,
+                                description: task.description,
+                                story_points: task.story_points
+                            })
+                        });
+                        taskCount++;
+                    }
+                }
+                
+                this.showToast(`Created board "${boardData.name}" with ${createdColumns.length} columns and ${taskCount} tasks!`, 'success');
+            } else {
+                this.showToast(`Created board "${boardData.name}" with ${createdColumns.length} columns!`, 'success');
+            }
+            
+            // Load the new board
+            await this.loadBoards();
+            document.getElementById('board-select').value = boardResponse.id;
+            await this.loadBoard(boardResponse.id);
+            
+        } catch (error) {
+            console.error('Error creating board with tasks:', error);
+            this.showToast('Failed to create board with tasks', 'error');
+        }
     }
     
     async applyTasksSuggestion(tasksData) {

@@ -435,9 +435,10 @@ async function callOpenAI(type, prompt, context) {
     }
 
     // Try to parse as JSON for structured responses
-    if (type === 'bulk-tasks' || type === 'board-creation') {
+    if (type === 'bulk-tasks' || type === 'board-creation' || type === 'board-with-tasks') {
       try {
         const jsonResponse = JSON.parse(content);
+        
         // Ensure the response has the correct structure for bulk tasks
         if (type === 'bulk-tasks') {
           // If the AI returned a direct tasks array, wrap it properly
@@ -463,11 +464,35 @@ async function callOpenAI(type, prompt, context) {
             };
           }
         }
+        
+        // Ensure the response has the correct structure for board-with-tasks
+        if (type === 'board-with-tasks') {
+          // If it's already properly structured, return as is
+          if (jsonResponse.type === 'board-with-tasks' && jsonResponse.data) {
+            return jsonResponse;
+          }
+          // If it has the data but wrong structure, fix it
+          if (jsonResponse.name && jsonResponse.columns) {
+            return {
+              type: 'board-with-tasks',
+              data: {
+                name: jsonResponse.name,
+                description: jsonResponse.description || '',
+                columns: jsonResponse.columns || [],
+                tasks: jsonResponse.tasks || []
+              }
+            };
+          }
+        }
+        
         return jsonResponse;
       } catch (e) {
         // If JSON parsing fails, use intelligent fallback for task types
         if (type === 'bulk-tasks') {
           return getIntelligentFallback(prompt, context);
+        }
+        if (type === 'board-with-tasks') {
+          return getBoardWithTasksFallback(prompt, context);
         }
         throw e;
       }
@@ -477,6 +502,11 @@ async function callOpenAI(type, prompt, context) {
     // But if it's a bulk-tasks request, try to parse natural language into tasks
     if (type === 'bulk-tasks') {
       return parseNaturalLanguageIntoTasks(content, context);
+    }
+    
+    // If it's a board-with-tasks request, try to parse natural language into board
+    if (type === 'board-with-tasks') {
+      return parseNaturalLanguageIntoBoard(content, context);
     }
     
     return {
@@ -503,6 +533,9 @@ function getSystemPrompt(type) {
   switch (type) {
     case 'board-creation':
       return basePrompt + " Help users create project boards with appropriate names, descriptions, and column suggestions. Respond with a JSON object containing 'name', 'description', and 'columns' array with objects having 'name', 'description', and 'color' properties.";
+    
+    case 'board-with-tasks':
+      return basePrompt + " Create a complete project board with columns and tasks. Respond ONLY with a JSON object in this exact format: {\"type\": \"board-with-tasks\", \"data\": {\"name\": \"Board Name\", \"description\": \"Board description\", \"columns\": [{\"name\": \"Column Name\", \"description\": \"Column purpose\", \"color\": \"#667eea\"}], \"tasks\": [{\"title\": \"Task Title\", \"description\": \"Task description\", \"story_points\": 5, \"priority\": \"High\"}]}}. Generate 3-4 columns (like To Do, In Progress, Done) and 5-10 relevant tasks. Story points should be 1-13 (Fibonacci sequence). Priority should be High/Medium/Low.";
     
     case 'bulk-tasks':
       return basePrompt + " Analyze content and generate actionable project management tasks. Respond ONLY with a JSON object in this exact format: {\"type\": \"tasks\", \"data\": {\"tasks\": [{\"title\": \"Task Title\", \"description\": \"Task description\", \"story_points\": 5, \"priority\": \"High\"}]}}. Generate 3-8 relevant tasks. Story points should be 1-13 (Fibonacci sequence). Priority should be High/Medium/Low.";
@@ -600,6 +633,138 @@ function parseNaturalLanguageIntoTasks(content, context = {}) {
     type: 'tasks',
     data: {
       tasks: tasks.slice(0, 10) // Limit to 10 tasks max
+    }
+  };
+}
+
+function parseNaturalLanguageIntoBoard(content, context = {}) {
+  console.log('Parsing natural language into board with tasks');
+  
+  // Extract board name from content
+  const lines = content.split('\n').filter(line => line.trim());
+  let boardName = 'New Project Board';
+  let boardDescription = '';
+  
+  // Look for title patterns
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (trimmed && (trimmed.includes('Board:') || trimmed.includes('Project:') || trimmed.startsWith('#'))) {
+      boardName = trimmed.replace(/^(Board:|Project:|#+)\s*/, '').trim();
+      break;
+    }
+  }
+  
+  // Default columns
+  const columns = [
+    { name: 'To Do', description: 'Tasks to be started', color: '#3b82f6' },
+    { name: 'In Progress', description: 'Tasks currently being worked on', color: '#f59e0b' },
+    { name: 'Review', description: 'Tasks under review', color: '#8b5cf6' },
+    { name: 'Done', description: 'Completed tasks', color: '#10b981' }
+  ];
+  
+  // Parse tasks from content
+  const tasks = [];
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.length < 3) continue;
+    
+    const taskPatterns = [
+      /^[-*•]\s*(.+)$/,
+      /^\d+\.\s*(.+)$/,
+      /^(?:Task|TODO|Action):\s*(.+)$/i
+    ];
+    
+    let taskTitle = null;
+    for (const pattern of taskPatterns) {
+      const match = trimmed.match(pattern);
+      if (match) {
+        taskTitle = match[1].trim();
+        break;
+      }
+    }
+    
+    if (taskTitle && taskTitle.length > 3 && !taskTitle.includes('Board:') && !taskTitle.includes('Project:')) {
+      let title = taskTitle;
+      let description = '';
+      
+      const descMatch = taskTitle.match(/^([^:-]+)[:−-]\s*(.+)$/);
+      if (descMatch) {
+        title = descMatch[1].trim();
+        description = descMatch[2].trim();
+      }
+      
+      // Estimate story points
+      let storyPoints = 3;
+      const complexityKeywords = ['design', 'implement', 'develop', 'build', 'integrate'];
+      if (complexityKeywords.some(keyword => title.toLowerCase().includes(keyword))) {
+        storyPoints = 8;
+      } else if (title.toLowerCase().includes('test') || title.toLowerCase().includes('review')) {
+        storyPoints = 2;
+      }
+      
+      tasks.push({
+        title: title,
+        description: description || `Complete the task: ${title}`,
+        story_points: storyPoints,
+        priority: 'Medium'
+      });
+    }
+  }
+  
+  // If no tasks found, create some default ones
+  if (tasks.length === 0) {
+    tasks.push(
+      { title: 'Project Planning', description: 'Define project scope and requirements', story_points: 5, priority: 'High' },
+      { title: 'Research & Analysis', description: 'Conduct necessary research and analysis', story_points: 3, priority: 'Medium' },
+      { title: 'Implementation', description: 'Begin implementation work', story_points: 8, priority: 'High' }
+    );
+  }
+  
+  return {
+    type: 'board-with-tasks',
+    data: {
+      name: boardName,
+      description: boardDescription || `Project board for ${boardName}`,
+      columns: columns,
+      tasks: tasks.slice(0, 10)
+    }
+  };
+}
+
+function getBoardWithTasksFallback(prompt, context = {}) {
+  console.log('Using board-with-tasks fallback');
+  
+  // Extract project type from prompt
+  const promptLower = prompt.toLowerCase();
+  let projectType = 'Project';
+  
+  if (promptLower.includes('software') || promptLower.includes('app') || promptLower.includes('development')) {
+    projectType = 'Software Development';
+  } else if (promptLower.includes('marketing') || promptLower.includes('campaign')) {
+    projectType = 'Marketing Campaign';
+  } else if (promptLower.includes('design') || promptLower.includes('ui') || promptLower.includes('ux')) {
+    projectType = 'Design Project';
+  }
+  
+  return {
+    type: 'board-with-tasks',
+    data: {
+      name: `${projectType} Board`,
+      description: `Comprehensive project board for ${projectType.toLowerCase()} management`,
+      columns: [
+        { name: 'Backlog', description: 'Ideas and future tasks', color: '#6b7280' },
+        { name: 'To Do', description: 'Tasks ready to start', color: '#3b82f6' },
+        { name: 'In Progress', description: 'Active work items', color: '#f59e0b' },
+        { name: 'Done', description: 'Completed tasks', color: '#10b981' }
+      ],
+      tasks: [
+        { title: 'Project Kickoff', description: 'Initialize project and set up team', story_points: 3, priority: 'High' },
+        { title: 'Requirements Analysis', description: 'Gather and analyze project requirements', story_points: 5, priority: 'High' },
+        { title: 'Planning & Design', description: 'Create project plan and design documents', story_points: 8, priority: 'High' },
+        { title: 'Implementation Phase 1', description: 'Begin core implementation work', story_points: 13, priority: 'Medium' },
+        { title: 'Testing & QA', description: 'Quality assurance and testing', story_points: 5, priority: 'Medium' },
+        { title: 'Documentation', description: 'Create project documentation', story_points: 3, priority: 'Low' }
+      ]
     }
   };
 }
